@@ -1,0 +1,4 @@
+<p>Здравствуйте{{if .UserName}}, {{.UserName}}{{end}}!</p>
+<p>Ваш код подтверждения ({{.ChannelRu}}):</p>
+<div class="code"><span>{{.CodeSpaced}}</span></div>
+<p class="hint">Срок действия: {{.ExpiresMinutes}} минут. Никому не сообщайте этот код.</p>

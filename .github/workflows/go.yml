@@ -1,0 +1,45 @@
+name: Go
+
+on:
+  pull_request:
+    branches: ["master"]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GOENV: "off"
+  GOWORK: "off"
+  GOTOOLCHAIN: local
+  GOAUTH: "off"
+  GOPRIVATE: ""
+  GONOPROXY: ""
+  GONOSUMDB: ""
+  GOPROXY: https://proxy.golang.org
+  GOSUMDB: sum.golang.org
+  GOVCS: "*:off"
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up project Go toolchain
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Minimal pull request checks
+        run: make ci-check

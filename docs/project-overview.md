@@ -78,6 +78,12 @@ prefer ASCII. NotifyHub rejects invalid `ProjectKey` values at construction with
 normalizing or logging secrets. Its expiration wire format uses whole Unix seconds
 (fractional seconds truncated); an expired wire deadline returns `ErrExpired` locally.
 
+NotifyHub error classification follows the HTTP status and `Retry-After` header even when
+an optional error body is malformed, interrupted, or oversized. Read failures remain
+available through `errors.Is`; typed gateway errors remain available through `errors.As`.
+Raw response bodies are not included in error messages. Gateway codes are limited to
+64 ASCII letters, digits, underscores, hyphens or dots; other values use a fixed fallback.
+
 Outbox Backend Compatibility:
 - `outbox.DeferAt` requires backend module versions implementing `DeferJobsRepository` and compatible with outbox v0.15. PostgreSQL, MySQL, SQLite and Picodata backends have independent module versions; updating the root module does not update them automatically. Verify selected host versions with `go list -m all` before deploying worker nodes.
 

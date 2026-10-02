@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	defaultTimeout          = 10 * time.Second
-	maxResponseBytes        = 1 << 20 // 1 MiB limit for defense against unbounded memory consumption
-	maxDiagnosticErrorBytes = 256
-	maxRetryAfter           = time.Duration(1<<63 - 1)
+	defaultTimeout    = 10 * time.Second
+	maxResponseBytes  = 1 << 20 // 1 MiB limit for defense against unbounded memory consumption
+	maxErrorCodeBytes = 64
+	maxRetryAfter     = time.Duration(1<<63 - 1)
 )
 
 // DeliveryStatus represents the delivery status reported by NotifyHub.
@@ -250,15 +250,21 @@ func (c *Client) Submit(ctx context.Context, req transport.Request) (transport.R
 
 	limitedBody := io.LimitReader(resp.Body, maxResponseBytes+1)
 	respBytes, err := io.ReadAll(limitedBody)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		// Status and headers remain authoritative if an optional error body is incomplete or oversized.
+		if err != nil {
+			return emptyReceipt, fmt.Errorf("%w: read error response: %w", mapHTTPError(resp.StatusCode, resp.Header, nil), err)
+		}
+		if len(respBytes) > maxResponseBytes {
+			respBytes = nil
+		}
+		return emptyReceipt, mapHTTPError(resp.StatusCode, resp.Header, respBytes)
+	}
 	if err != nil {
 		return emptyReceipt, fmt.Errorf("notifyhub: read response: %w", err)
 	}
 	if len(respBytes) > maxResponseBytes {
 		return emptyReceipt, fmt.Errorf("%w: response exceeds maximum size of %d bytes", transport.ErrInvalidResponse, maxResponseBytes)
-	}
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return emptyReceipt, mapHTTPError(resp.StatusCode, resp.Header, respBytes)
 	}
 
 	receipt, err := decodeReceipt(respBytes)
@@ -295,15 +301,21 @@ func (c *Client) Get(ctx context.Context, id string) (transport.Receipt, error) 
 
 	limitedBody := io.LimitReader(resp.Body, maxResponseBytes+1)
 	respBytes, err := io.ReadAll(limitedBody)
+	if resp.StatusCode != http.StatusOK {
+		// Status and headers remain authoritative if an optional error body is incomplete or oversized.
+		if err != nil {
+			return emptyReceipt, fmt.Errorf("%w: read error response: %w", mapHTTPError(resp.StatusCode, resp.Header, nil), err)
+		}
+		if len(respBytes) > maxResponseBytes {
+			respBytes = nil
+		}
+		return emptyReceipt, mapHTTPError(resp.StatusCode, resp.Header, respBytes)
+	}
 	if err != nil {
 		return emptyReceipt, fmt.Errorf("notifyhub: read get response: %w", err)
 	}
 	if len(respBytes) > maxResponseBytes {
 		return emptyReceipt, fmt.Errorf("%w: response exceeds maximum size of %d bytes", transport.ErrInvalidResponse, maxResponseBytes)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return emptyReceipt, mapHTTPError(resp.StatusCode, resp.Header, respBytes)
 	}
 
 	receipt, err := decodeReceipt(respBytes)
@@ -429,15 +441,10 @@ func mapHTTPError(statusCode int, header http.Header, bodyBytes []byte) error {
 		}
 
 	default:
-		safeDiag := truncateDiagnostic(bodyBytes, maxDiagnosticErrorBytes)
-		msg := fmt.Sprintf("unexpected status code %d", statusCode)
-		if safeDiag != "" {
-			msg = fmt.Sprintf("unexpected status code %d: %s", statusCode, safeDiag)
-		}
 		return &transport.RequestError{
 			StatusCode: statusCode,
 			Code:       fmt.Sprintf("http_%d", statusCode),
-			Message:    msg,
+			Message:    fmt.Sprintf("unexpected status code %d", statusCode),
 			Err:        transport.ErrTemporarilyUnavailable,
 		}
 	}
@@ -445,7 +452,7 @@ func mapHTTPError(statusCode int, header http.Header, bodyBytes []byte) error {
 
 func parseErrorCode(data []byte, defaultCode string) string {
 	var errResp hubErrorResponse
-	if err := json.Unmarshal(data, &errResp); err == nil && errResp.Error != "" {
+	if err := json.Unmarshal(data, &errResp); err == nil && validErrorCode(errResp.Error) {
 		return errResp.Error
 	}
 	return defaultCode
@@ -471,11 +478,17 @@ func parseRetryAfter(h string) time.Duration {
 	return 0
 }
 
-func truncateDiagnostic(b []byte, maxLen int) string {
-	s := strings.TrimSpace(string(b))
-	runes := []rune(s)
-	if len(runes) > maxLen {
-		return string(runes[:maxLen]) + "..."
+// Gateway codes are bounded machine identifiers, never free-form response diagnostics.
+func validErrorCode(code string) bool {
+	if len(code) == 0 || len(code) > maxErrorCodeBytes {
+		return false
 	}
-	return s
+	for _, ch := range code {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_' || ch == '-' || ch == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }

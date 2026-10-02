@@ -468,3 +468,30 @@ The transport API release is now planned as v0.5.0; no existing tag may move.
 Updated active release and migration instructions, including the independently
 versioned PostgreSQL backend and a producer-pause/v1-drain cutover. Publication
 and history cleanup remain operator gates. This is a documentation-only change.
+
+## 2026-10-02: NotifyHub response classification and safe diagnostics
+
+- Confirmed two adapter defects with synthetic `http.RoundTripper` fixtures: an
+  oversized/interrupted response body hid its definitive HTTP error class and
+  `Retry-After`, and free-form gateway error bodies/codes escaped into returned
+  errors (including multiline and large values).
+- `Submit` and `Get` now classify non-success responses by status/header before
+  reporting optional-body failures. Multiple wrapped causes preserve both the
+  typed transport error and the original read/cancellation error for
+  `errors.Is`/`errors.As`. Successful receipt validation remains strict and bounded.
+- Unknown-status bodies are no longer included in diagnostics. Optional gateway
+  codes use a 64-byte ASCII identifier grammar and fall back to stable codes when
+  invalid. This deliberately removes free-form provider diagnostics; callers
+  retain HTTP status and typed error semantics.
+- Exported APIs, schema version, retry/defer policy, and provider ownership are
+  unchanged. GoNotify v0.5 has no direct SMTP transport or provider worker.
+- Checks passed with Go 1.27.1: full unit tests, race tests repeated five times,
+  formatting, vet, configured lint, tidy diff, generation, CI-equivalent checks,
+  trimpath/race, coverage generation, and offline public-consumer safeguards.
+  The new fixtures cover status precedence, interrupted/canceled bodies,
+  response close/bounds, gateway codes, caller/client deadlines, and real outbox
+  error dispositions. They fail against the original adapter and pass with this
+  change.
+- A fresh anonymous local-consumer attempt was blocked by public proxy DNS/network
+  unreachability. This is not publication-readiness evidence. No live provider,
+  production delivery, push, PR, merge, or deployment was performed.

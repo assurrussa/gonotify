@@ -5,6 +5,16 @@
 The existing `v0.4.0` tag points to the legacy API. The transport migration
 requires a new immutable `v0.5.0` tag; do not move or reuse `v0.4.0`.
 
+### Confidential email
+- Added `Client.SendConfidentialEmail` with dedicated request, receipt and outcome
+  types on the existing NotifyHub connection. Explicit provider acceptance is
+  separate from ordinary queue admission and inbox delivery.
+- Stable idempotency, original token expiry, bounded synchronous I/O, strict
+  receipt validation, and sanitized unknown/retry/rejection outcomes fail closed
+  without queue, replay, or direct-SMTP fallback.
+- Reject endpoint-suffixed or credential-bearing BaseURLs with safe actionable
+  diagnostics while retaining deployment prefixes and redirect protection.
+
 ### Review fixes
 - Recursive startup preloading for nested message templates, including static
   reference validation and partial parsing when no message uses the engine yet.

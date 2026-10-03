@@ -7,7 +7,7 @@ import (
 	_ "github.com/assurrussa/gonotify/di"
 	// Compile-check the stable outbox support package.
 	_ "github.com/assurrussa/gonotify/interfaces/outbox/notifications"
-	// Compile-check the new templates and transport packages.
+	// Compile-check templates and transports, including dedicated confidential email.
 	_ "github.com/assurrussa/gonotify/templates"
 	_ "github.com/assurrussa/gonotify/transport"
 	_ "github.com/assurrussa/gonotify/transport/notifyhub"

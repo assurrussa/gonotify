@@ -495,3 +495,39 @@ and history cleanup remain operator gates. This is a documentation-only change.
 - A fresh anonymous local-consumer attempt was blocked by public proxy DNS/network
   unreachability. This is not publication-readiness evidence. No live provider,
   production delivery, push, PR, merge, or deployment was performed.
+
+
+## 2026-10-03: Dedicated confidential synchronous email
+
+- Added `notifyhub.Client.SendConfidentialEmail` and dedicated public request,
+  receipt, outcome and error types in the existing stable package. Ordinary
+  `Transport.Submit` and outbox behavior remain separate. The same client,
+  BaseURL and ProjectKey authorize `/v1/confidential-email`.
+- Coordinated the NotifyHub wire contract before implementation: single rendered
+  email, required original Unix-second expiry, stable Idempotency-Key; only
+  HTTP 200 `accepted` is provider handoff. Simulated, dispatching, unknown,
+  explicit retry and definitive rejection have distinct typed outcomes. Missing
+  endpoints, malformed receipts and ordinary HTTP 202 never become success.
+- Expiry is floored, so it may end less than one second early but is never
+  extended. The caller must keep the original expiry and content across attempts.
+  No automatic retry, HTTP body replay, queue persistence or direct fallback is
+  performed by the client. An ambiguous result must not invalidate a token or
+  cause a new-key resend. Gateway metadata-only durability is a separate server
+  requirement, documented in `docs/confidential-email.md`.
+- Confidential diagnostics expose only fixed/allowlisted codes and safe context
+  causes; neither raw response bodies nor network diagnostics are wrapped.
+  Constructor errors are sanitized; userinfo/query/fragment and an endpoint
+  suffix `/v1/notifications` fail with a safe actionable configuration error.
+- Verified with Go 1.27.1 and managed shared caches: formatting, vet, all
+  configured linters, full unit tests, race tests repeated five times,
+  trimpath/race, coverage, generation, tidy diff, offline public-consumer
+  safeguards and `make ci-check`. Gateway client statement coverage was 96.3%.
+  Tests use synthetic local HTTP servers/transports only and cover repeat,
+  unknown, mismatch, simulated, 202, expiry precision, timeout/cancellation,
+  bounded bodies, sanitized diagnostics and redirect protection.
+- `make check` reached its final fresh anonymous consumer step, which could not
+  resolve the official public module proxy because sandbox DNS/network was
+  unreachable. The same isolated gate also failed after permitted escalation;
+  shared-cache checks are not substituted for that gate. Publication-readiness
+  is therefore not established. No real sends, production configuration,
+  deployment, push, PR or review run was performed for this local implementation.

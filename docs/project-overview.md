@@ -18,7 +18,7 @@ Stable packages:
 - `github.com/assurrussa/gonotify` for primary type aliases and errors.
 - `github.com/assurrussa/gonotify/templates` for immutable template rendering.
 - `github.com/assurrussa/gonotify/transport` for transport contracts and message models.
-- `github.com/assurrussa/gonotify/transport/notifyhub` for the NotifyHub gateway client and delivery statuses.
+- `github.com/assurrussa/gonotify/transport/notifyhub` for the NotifyHub gateway client, dedicated confidential-email requests/outcomes, and delivery statuses.
 - `github.com/assurrussa/gonotify/di` for `godi` host wiring.
 - `github.com/assurrussa/gonotify/interfaces/outbox/notifications` for
   deferred notification jobs (schema version 2).
@@ -86,6 +86,19 @@ Raw response bodies are not included in error messages. Gateway codes are limite
 
 Outbox Backend Compatibility:
 - `outbox.DeferAt` requires backend module versions implementing `DeferJobsRepository` and compatible with outbox v0.15. PostgreSQL, MySQL, SQLite and Picodata backends have independent module versions; updating the root module does not update them automatically. Verify selected host versions with `go list -m all` before deploying worker nodes.
+
+## Confidential Email
+
+`notifyhub.Client.SendConfidentialEmail` is a separate synchronous capability,
+using the existing client connection, key, timeout and redirect policy. It sends
+single-recipient token-bearing mail to `/v1/confidential-email` without using
+`transport.Transport.Submit`, the outbox, or an SMTP fallback. Only HTTP 200 with
+an accepted receipt confirms provider handoff; inbox delivery is not established.
+
+See [the confidential-email contract](confidential-email.md) for required expiry,
+stable idempotency, explicit failure outcomes, and metadata-only gateway storage.
+The gateway origin/deployment prefix must not end with `/v1/notifications` or
+contain user information, query parameters or fragments.
 
 ## Shared Wiki Alignment
 

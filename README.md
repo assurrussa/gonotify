@@ -15,6 +15,7 @@ contracts, a NotifyHub delivery gateway client, and outbox job processing.
 - **Immutable templates**: HTML/text rendering with auto-escaping, layouts, partials, caching, and preloading via `templates`.
 - **Unified transport**: Provider-neutral `transport.Transport` contract with typed errors (`QuotaError`, `RequestError`, etc.) and optional capability interfaces (`ReceiptReader`, `HealthChecker`).
 - **NotifyHub client**: NotifyHub HTTP client adapter (`transport/notifyhub`) with bearer auth, idempotency keys, no-redirect security policy, and RFC 7231 `Retry-After`.
+- **Confidential email**: `Client.SendConfidentialEmail` uses the same gateway client and project key for immediate, metadata-only, single-recipient provider handoff, with explicit unknown/retry/rejection outcomes and no queue fallback. See [confidential email](docs/confidential-email.md).
 - **Retry-safe outbox (v2)**: Deferred job handling (`interfaces/outbox/notifications`) supporting pre-rendered transport requests with schema version 2, downstream delivery idempotency keys, and typed outbox dispositions (`Permanent`, `RetryAt`, `DeferAt`).
 - **Dependency injection**: Clean wiring through `godi` via `di.ModuleBootstrap()`.
 
@@ -35,7 +36,7 @@ The stable consumer surface is defined in
 - `github.com/assurrussa/gonotify` — primary type aliases and errors.
 - `github.com/assurrussa/gonotify/templates` — immutable template engine (`Renderer`, `PreloadableRenderer`, `RenderedContent`).
 - `github.com/assurrussa/gonotify/transport` — transport interface, message models, and typed delivery errors.
-- `github.com/assurrussa/gonotify/transport/notifyhub` — NotifyHub gateway HTTP transport client and delivery statuses.
+- `github.com/assurrussa/gonotify/transport/notifyhub` — NotifyHub gateway HTTP transport, dedicated confidential-email requests/outcomes, and delivery statuses.
 - `github.com/assurrussa/gonotify/di` — host wiring through `godi`.
 - `github.com/assurrussa/gonotify/interfaces/outbox/notifications` — deferred notification jobs, schema version 2, and payloads.
 
@@ -115,6 +116,8 @@ func main() {
 ```
 
 > [!NOTE]
+`Config.BaseURL` is the gateway origin or deployment prefix (for example, `https://notify.example/prefix`), without `/v1/notifications`, user information, query parameters, or a fragment. Endpoint URLs are rejected with an actionable error instead of duplicating the API path.
+
 > **Receipt Semantics**: A successful `Submit` (`err == nil`) confirms that NotifyHub has accepted and durably persisted the notification request. It does not mean the message has already been delivered to the recipient or accepted by upstream SMTP/Telegram providers. Delivery progression (`queued`, `sending`, `accepted`, `delivered`, `bounced`) is reflected in `Receipt.Deliveries` and can be queried via `ReceiptReader.Get(ctx, id)`.
 
 > [!SECURITY]

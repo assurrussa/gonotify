@@ -87,18 +87,24 @@ func New(cfg Config) (*Client, error) {
 
 	parsedURL, err := url.Parse(strings.TrimRight(trimmedBaseURL, "/"))
 	if err != nil {
-		return nil, fmt.Errorf("notifyhub: invalid BaseURL: %w", err)
+		return nil, errors.New("notifyhub: invalid BaseURL")
 	}
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return nil, fmt.Errorf("notifyhub: invalid BaseURL scheme %q; must be http or https", parsedURL.Scheme)
+		return nil, errors.New("notifyhub: BaseURL scheme must be http or https")
 	}
 	if parsedURL.Host == "" {
 		return nil, errors.New("notifyhub: BaseURL must include a host")
 	}
+	if parsedURL.User != nil || parsedURL.RawQuery != "" || parsedURL.ForceQuery || parsedURL.Fragment != "" {
+		return nil, errors.New("notifyhub: BaseURL must not contain user information, query parameters, or a fragment")
+	}
+	if strings.HasSuffix(strings.TrimRight(parsedURL.Path, "/"), "/v1/notifications") {
+		return nil, errors.New("notifyhub: BaseURL must be the gateway origin or deployment prefix; remove /v1/notifications")
+	}
 	if parsedURL.Scheme == "http" && !cfg.AllowInsecureHTTP {
 		hostname := parsedURL.Hostname()
 		if !isLoopbackHost(hostname) {
-			return nil, fmt.Errorf("notifyhub: insecure http scheme for remote host %q requires AllowInsecureHTTP=true", hostname)
+			return nil, errors.New("notifyhub: insecure HTTP for remote hosts requires AllowInsecureHTTP=true")
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/assurrussa/gonotify"
 	notificationsjob "github.com/assurrussa/gonotify/interfaces/outbox/notifications"
@@ -101,5 +102,24 @@ func TestConsumerOutboxPayload(t *testing.T) {
 	job := notificationsjob.Must(notificationsjob.NewOptions(&dummyTransport{}))
 	if err := job.Handle(context.Background(), encoded); err != nil {
 		t.Fatalf("job handle failed: %v", err)
+	}
+}
+
+// Confidential sends deliberately do not implement the durable transport contract.
+func TestConsumerConfidentialClientSurface(t *testing.T) {
+	client, err := notifyhub.New(notifyhub.Config{BaseURL: "https://notify.example.invalid", ProjectKey: "synthetic-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := notifyhub.ConfidentialEmailRequest{
+		IdempotencyKey: "consumer-confidential-key", Event: "auth.password_reset", ExpiresAt: time.Unix(1, 0),
+		Email: transport.EmailMessage{From: "from@example.test", To: []string{"to@example.test"}, Subject: "Reset", Text: "synthetic"},
+	}
+	var receipt notifyhub.ConfidentialEmailReceipt
+	receipt, err = client.SendConfidentialEmail(context.Background(), request)
+	var typed *notifyhub.ConfidentialEmailError
+	if !errors.Is(err, transport.ErrExpired) || !errors.As(err, &typed) ||
+		typed.Outcome != notifyhub.OutcomeNotSent || receipt.ID != "" {
+		t.Fatalf("confidential expiration contract changed: %v", err)
 	}
 }

@@ -78,8 +78,11 @@ engines enforce `missingkey=error` to prevent delivering notifications with miss
 `transport.Transport` defines `Submit(ctx, Request) (Receipt, error)`.
 `transport/notifyhub.New` creates an HTTP client for the NotifyHub delivery gateway
 with bearer authorization, idempotency keys, redirect blocking, and RFC 7231 `Retry-After` support.
-`Client.SendConfidentialEmail` is a separate synchronous, single-recipient operation
-using that same connection, never the durable transport/outbox. Only explicit
+`Request.Priority` accepts empty/normal/high; high requires an absolute expiry.
+`Submit` success means queue ownership only; classify delivery status and reconcile
+via `Get`, preserving unknown outcomes without fallback or a new key.
+`Client.SendConfidentialEmail` is a deprecated separate synchronous, single-recipient operation
+using that same connection, never the durable transport/outbox. Its endpoint is retired (HTTP 410); it never silently switches to a queue. Only explicit
 provider acceptance succeeds; see `docs/confidential-email.md` for fail-closed
 outcomes, stable retries, expiry precision, and the metadata-only gateway contract.
 

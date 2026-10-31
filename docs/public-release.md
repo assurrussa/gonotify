@@ -1,5 +1,11 @@
 # Public release readiness
 
+Current queued-mail candidate: select its release version only with explicit
+owner approval after gates. No new tag has been selected or published here. The
+v0.5 transition plan below is historical context, not the candidate version.
+Priority producers require compatible workers; see the mixed-worker constraint
+in [project overview](project-overview.md#priority-and-mixed-outbox-workers).
+
 ## Scope
 
 The planned `v0.5.0` release completes the transition of `gonotify` from a legacy direct delivery

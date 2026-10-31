@@ -18,7 +18,7 @@ Stable packages:
 - `github.com/assurrussa/gonotify` for primary type aliases and errors.
 - `github.com/assurrussa/gonotify/templates` for immutable template rendering.
 - `github.com/assurrussa/gonotify/transport` for transport contracts and message models.
-- `github.com/assurrussa/gonotify/transport/notifyhub` for the NotifyHub gateway client, dedicated confidential-email requests/outcomes, and delivery statuses.
+- `github.com/assurrussa/gonotify/transport/notifyhub` for the NotifyHub gateway client, queue priorities, status classification, and deprecated synchronous confidential-email requests/outcomes.
 - `github.com/assurrussa/gonotify/di` for `godi` host wiring.
 - `github.com/assurrussa/gonotify/interfaces/outbox/notifications` for
   deferred notification jobs (schema version 2).
@@ -89,7 +89,16 @@ Outbox Backend Compatibility:
 
 ## Confidential Email
 
-`notifyhub.Client.SendConfidentialEmail` is a separate synchronous capability,
+`notifyhub.Client.SendConfidentialEmail` is a deprecated separate synchronous capability;
+the server endpoint is retired (HTTP 410). New migrated callers use `Submit` with
+`transport.PriorityHigh` and the original absolute expiry, preserve rendered
+content/key across retries, and reconcile receipt IDs through `Get`.
+`ClassifyDeliveryStatus` separates pending queue states, provider acceptance,
+delivery, simulation, failure and unknown. Unknown/future states never permit
+fallback or a new operation key. The ordinary durable queue does not guarantee
+metadata-only message retention.
+
+The legacy synchronous method retains its original semantics,
 using the existing client connection, key, timeout and redirect policy. It sends
 single-recipient token-bearing mail to `/v1/confidential-email` without using
 `transport.Transport.Submit`, the outbox, or an SMTP fallback. Only HTTP 200 with
@@ -105,3 +114,19 @@ contain user information, query parameters or fragments.
 The shared platform pages describe `gonotify` as the notification client library
 and link deferred delivery to `outbox` and `notifyhub`. Keep shared pages concise and
 contract-focused. Local docs and code win when there is drift.
+
+Terminal `failed`/`expired`/`suppressed` snapshots do not prove that a provider
+never accepted a prior attempt. Bounce/complaint snapshots conservatively classify
+as unknown because current receipts lack prior-handoff evidence. Applications must
+not turn these snapshots into permission to resend, reissue a key or fall back.
+
+### Priority and mixed outbox workers
+
+The existing schema2 envelope is unchanged for requests with empty priority:
+`priority` is omitted, preserving historical generic-job payloads. A pre-priority
+SDK worker ignores an unknown priority field. Therefore stop/join old workers
+before enabling producers which write high-priority schema2 requests; do not mix
+old and new workers or replay a high-priority operation through an old worker.
+This candidate does not silently bump the generic outbox capability or migrate
+old jobs. Migrated security-mail adapters use direct Submit plus their persisted
+transport-protocol fence; generic GoAdmin/ordinary routing is not upgraded here.

@@ -116,10 +116,23 @@ func TestConsumerConfidentialClientSurface(t *testing.T) {
 		Email: transport.EmailMessage{From: "from@example.test", To: []string{"to@example.test"}, Subject: "Reset", Text: "synthetic"},
 	}
 	var receipt notifyhub.ConfidentialEmailReceipt
+	//nolint:staticcheck // Compatibility probe verifies the deprecated API retains fail-closed expiry semantics.
 	receipt, err = client.SendConfidentialEmail(context.Background(), request)
 	var typed *notifyhub.ConfidentialEmailError
 	if !errors.Is(err, transport.ErrExpired) || !errors.As(err, &typed) ||
 		typed.Outcome != notifyhub.OutcomeNotSent || receipt.ID != "" {
 		t.Fatalf("confidential expiration contract changed: %v", err)
+	}
+}
+
+func TestConsumerQueuedMailSurface(t *testing.T) {
+	expires := time.Now().Add(time.Minute)
+	request := gonotify.Request{Priority: gonotify.PriorityHigh, ExpiresAt: &expires}
+	if err := gonotify.ValidatePriority(request.Priority, request.ExpiresAt); err != nil {
+		t.Fatal(err)
+	}
+	if notifyhub.ClassifyDeliveryStatus(string(notifyhub.StatusQueued)) != notifyhub.DeliveryPending ||
+		notifyhub.ClassifyDeliveryStatus(string(notifyhub.StatusUnknown)) != notifyhub.DeliveryUnknown {
+		t.Fatal("queue ownership confused with provider acceptance")
 	}
 }

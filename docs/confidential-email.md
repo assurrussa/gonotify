@@ -1,6 +1,28 @@
-# Confidential synchronous email
+# Retired confidential synchronous email
 
-Use `(*notifyhub.Client).SendConfidentialEmail` for rendered single-recipient,
+**Migration:** NotifyHub retired `POST /v1/confidential-email` with HTTP 410.
+For explicitly migrated applications use `Submit` on `/v1/notifications` with
+`PriorityHigh`, the original absolute `ExpiresAt`, and the same opaque key and
+rendered content across attempts **within the new queue protocol**. Do not replay
+old confidential operations into that queue: historical keys are fenced and
+message bodies are not migrated. Classify old operations as accepted, definitively
+not sent, or unknown before switching; accepted/unknown must never receive a new
+namespace/key or fallback send. Hold pre-cutover managed rows for explicit review.
+HTTP 202 means durable queue ownership only.
+Save the returned receipt ID and reconcile with `Get`; classify each delivery
+using `ClassifyDeliveryStatus`. Queued/retry are pending, accepted is provider
+handoff, delivered is distinct, simulated is not a real send, and unknown must
+never trigger a new key or fallback. The normal durable queue does not promise
+metadata-only payload retention. See the [queued email contract](../README.md#queued-short-lived-email).
+
+The existing `SendConfidentialEmail` method is deprecated but deliberately keeps
+its old synchronous semantics; it never treats queue admission as provider
+acceptance or silently calls the queue. A retired endpoint fails closed as
+`OutcomeNotSent` with HTTP 410 (the legacy expiration classification remains
+unchanged). The remainder documents the **legacy** endpoint only.
+
+
+Legacy callers used `(*notifyhub.Client).SendConfidentialEmail` for rendered single-recipient,
 short-lived credential mail. Reuse the same `Client`, `Config.BaseURL` and
 `Config.ProjectKey` used by ordinary notifications. No second connection or
 credential is needed. The server must support `POST /v1/confidential-email`;
@@ -77,3 +99,8 @@ Tests use local `httptest` servers and synthetic transports only. They cover
 wire/auth/prefix contracts, accepted duplicates, unchanged retry/unknown
 requests, conflicts, expiration, timeout/cancellation, rejected/malformed
 receipts, response limits, redirect protection and sanitized diagnostics.
+
+Terminal `failed`/`expired`/`suppressed` snapshots do not prove that a provider
+never accepted a prior attempt. Bounce/complaint snapshots conservatively classify
+as unknown because current receipts lack prior-handoff evidence. Applications must
+not turn these snapshots into permission to resend, reissue a key or fall back.

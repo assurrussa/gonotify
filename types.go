@@ -1,6 +1,8 @@
 package gonotify
 
 import (
+	"time"
+
 	"github.com/assurrussa/gonotify/templates"
 	"github.com/assurrussa/gonotify/transport"
 )
@@ -11,6 +13,7 @@ type (
 	ReceiptReader   = transport.ReceiptReader
 	HealthChecker   = transport.HealthChecker
 	Request         = transport.Request
+	Priority        = transport.Priority
 	EmailMessage    = transport.EmailMessage
 	TelegramMessage = transport.TelegramMessage
 	Receipt         = transport.Receipt
@@ -49,4 +52,15 @@ const (
 // ValidateIdempotencyKey validates that key meets the gonotify transport contract.
 func ValidateIdempotencyKey(key string) error {
 	return transport.ValidateIdempotencyKey(key)
+}
+
+// Scheduling priorities from transport. High priority requires Request.ExpiresAt.
+const (
+	PriorityNormal = transport.PriorityNormal
+	PriorityHigh   = transport.PriorityHigh
+)
+
+// ValidatePriority checks supported priority values and the high-priority deadline requirement.
+func ValidatePriority(priority Priority, expiresAt *time.Time) error {
+	return transport.ValidatePriority(priority, expiresAt)
 }

@@ -2,7 +2,8 @@ package externalconsumer
 
 // RuntimePackages are stable packages used to create and send notifications.
 // Their contract includes idempotency validation and ErrExpired for normal expiration.
-// The notifyhub package also exposes separate synchronous confidential-email requests and outcomes.
+// The transport package includes normal/high priorities and validation. NotifyHub
+// exposes queue status classification and deprecated synchronous confidential-email outcomes.
 var RuntimePackages = [...]string{
 	"github.com/assurrussa/gonotify",
 	"github.com/assurrussa/gonotify/templates",

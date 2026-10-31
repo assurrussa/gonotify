@@ -1,5 +1,5 @@
-github.com/assurrussa/godi v0.9.2 h1:fwkgwg+xskJqbAER+6TYTQ3qDI/8Gi9x9d6YWUoecXk=
-github.com/assurrussa/godi v0.9.2/go.mod h1:gV3ls8GtxLLDO5NPD2RqSyVbMqZO0/snRMtIOYgnGVk=
+github.com/assurrussa/godi v0.11.0 h1:i4lLldHOMzwo6RVYev/oT7FXfSQfYkMyrd7rQbtTGXU=
+github.com/assurrussa/godi v0.11.0/go.mod h1:vwvJ7dQXzc9cyeRNMV1htWPReUkgbm7Na8HjjS4JB6Y=
 github.com/assurrussa/outbox v0.15.0 h1:ccuecT2Y0uBdgu9GXw0/UhW2FEocfv3j90DBdFGp6oM=
 github.com/assurrussa/outbox v0.15.0/go.mod h1:fzNmhtaNHltUtnUsj5KMQPNlnEB9tY/Z5MfsxJYvBgg=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

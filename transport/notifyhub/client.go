@@ -167,6 +167,7 @@ type hubTelegramPayload struct {
 //nolint:tagliatelle // Wire format requires snake_case for NotifyHub HTTP API.
 type hubRequestPayload struct {
 	Event     string              `json:"event"`
+	Priority  transport.Priority  `json:"priority,omitempty"`
 	Email     *hubEmailPayload    `json:"email,omitempty"`
 	Telegram  *hubTelegramPayload `json:"telegram,omitempty"`
 	ExpiresAt int64               `json:"expires_at,omitempty"`
@@ -189,11 +190,18 @@ type hubErrorResponse struct {
 	Error string `json:"error"`
 }
 
-// Submit sends a notification to NotifyHub.
+// Submit transfers ownership to NotifyHub's durable queue, not to a downstream provider.
+// HTTP 202 (including status unknown on a duplicate) is queue acceptance only.
+// Preserve the original key, rendered body, priority and absolute expiry on retries;
+// inspect Deliveries or Get for progression. Never fall back after an ambiguous attempt.
 func (c *Client) Submit(ctx context.Context, req transport.Request) (transport.Receipt, error) {
 	var emptyReceipt transport.Receipt
 
 	if err := transport.ValidateIdempotencyKey(req.IdempotencyKey); err != nil {
+		return emptyReceipt, err
+	}
+
+	if err := transport.ValidatePriority(req.Priority, req.ExpiresAt); err != nil {
 		return emptyReceipt, err
 	}
 
@@ -202,7 +210,8 @@ func (c *Client) Submit(ctx context.Context, req transport.Request) (transport.R
 	}
 
 	payload := hubRequestPayload{
-		Event: req.Event,
+		Event:    req.Event,
+		Priority: req.Priority,
 	}
 
 	if req.ExpiresAt != nil {

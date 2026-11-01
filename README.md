@@ -15,7 +15,7 @@ contracts, a NotifyHub delivery gateway client, and outbox job processing.
 - **Immutable templates**: HTML/text rendering with auto-escaping, layouts, partials, caching, and preloading via `templates`.
 - **Unified transport**: Provider-neutral `transport.Transport` contract with typed errors (`QuotaError`, `RequestError`, etc.) and optional capability interfaces (`ReceiptReader`, `HealthChecker`).
 - **NotifyHub client**: NotifyHub HTTP client adapter (`transport/notifyhub`) with bearer auth, idempotency keys, no-redirect security policy, and RFC 7231 `Retry-After`.
-- **Confidential email**: `Client.SendConfidentialEmail` uses the same gateway client and project key for immediate, metadata-only, single-recipient provider handoff, with explicit unknown/retry/rejection outcomes and no queue fallback. See [confidential email](docs/confidential-email.md).
+- **Queued short-lived email**: `Submit` with `PriorityHigh` and the original absolute expiry transfers ownership to NotifyHub; `Get` reconciles delivery. The synchronous `SendConfidentialEmail` endpoint is retired (HTTP 410); its legacy API does not silently switch to queued semantics. See [migration and legacy contract](docs/confidential-email.md).
 - **Retry-safe outbox (v2)**: Deferred job handling (`interfaces/outbox/notifications`) supporting pre-rendered transport requests with schema version 2, downstream delivery idempotency keys, and typed outbox dispositions (`Permanent`, `RetryAt`, `DeferAt`).
 - **Dependency injection**: Clean wiring through `godi` via `di.ModuleBootstrap()`.
 
@@ -36,7 +36,7 @@ The stable consumer surface is defined in
 - `github.com/assurrussa/gonotify` — primary type aliases and errors.
 - `github.com/assurrussa/gonotify/templates` — immutable template engine (`Renderer`, `PreloadableRenderer`, `RenderedContent`).
 - `github.com/assurrussa/gonotify/transport` — transport interface, message models, and typed delivery errors.
-- `github.com/assurrussa/gonotify/transport/notifyhub` — NotifyHub gateway HTTP transport, dedicated confidential-email requests/outcomes, and delivery statuses.
+- `github.com/assurrussa/gonotify/transport/notifyhub` — NotifyHub gateway HTTP transport, queue priority, delivery status classification, and deprecated synchronous confidential-email requests/outcomes.
 - `github.com/assurrussa/gonotify/di` — host wiring through `godi`.
 - `github.com/assurrussa/gonotify/interfaces/outbox/notifications` — deferred notification jobs, schema version 2, and payloads.
 
@@ -135,6 +135,36 @@ control bytes. ASCII keys such as `registration:01J...` are recommended.
 expiration. NotifyHub uses whole Unix seconds (fractional seconds are truncated), and
 the client returns `ErrExpired` before making an HTTP request once that wire deadline
 is reached. The gateway must enforce expiration for already admitted notifications.
+
+## Queued short-lived email
+
+Use the existing `Client.Submit` and `Client.Get`, not a second mail connection.
+Set `Request.Priority = transport.PriorityHigh` and `ExpiresAt` to the **original
+credential expiry**. Empty priority and `PriorityNormal` mean normal scheduling;
+only `normal` and `high` are accepted (not `low`), and high requires expiry.
+The client and outbox producer reject unsupported priority before submission.
+
+Before switching an existing sender, classify its old confidential operations as
+accepted, definitively not sent, or unknown. NotifyHub retains historical key
+fences and rejects reuse of old confidential keys in the new queue; it does not
+migrate their message bodies. Never change the namespace or invent another key
+for an accepted or unknown old operation. Hold pre-cutover rows for explicit
+reconciliation; only fresh post-cutover events enter the new protocol.
+
+HTTP 202 and a nil error establish queue ownership only. Save the receipt ID;
+`notifyhub.ClassifyDeliveryStatus(delivery.Status)` distinguishes `DeliveryPending`
+(queued/sending/retry), `DeliveryProviderAccepted`, `DeliveryDelivered`,
+`DeliverySimulated`, `DeliveryFailed` and `DeliveryUnknown`. Classify each delivery,
+not only the first item of a multi-recipient receipt. Accepted is provider handoff,
+not inbox delivery; simulated is not a real send. Unknown (including future status
+values) never establishes failure or success. Reconcile with `Get` and do not fall
+back to another channel/provider or create another key. Duplicate receipts retain
+their actual status; duplicate alone does not mean delivered.
+
+Retries must preserve the rendered body, event, priority, opaque idempotency key
+and absolute expiry. Never regenerate the token/body or calculate `now + TTL` on
+retry. The durable queue may store message content until completion/expiry: do not
+assume the retired confidential endpoint's metadata-only retention guarantees.
 
 ## Template Engine
 
@@ -294,3 +324,8 @@ make public-consumer-local
 ## License
 
 [MIT](LICENSE).
+
+Terminal `failed`/`expired`/`suppressed` snapshots do not prove that a provider
+never accepted a prior attempt. Bounce/complaint snapshots conservatively classify
+as unknown because current receipts lack prior-handoff evidence. Applications must
+not turn these snapshots into permission to resend, reissue a key or fall back.

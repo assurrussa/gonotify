@@ -27,6 +27,9 @@ func ValidateRequest(req transport.Request) error {
 	if err := transport.ValidateIdempotencyKey(req.IdempotencyKey); err != nil {
 		return fmt.Errorf("cannot process request: %w", err)
 	}
+	if err := transport.ValidatePriority(req.Priority, req.ExpiresAt); err != nil {
+		return fmt.Errorf("cannot process request: %w", err)
+	}
 	if req.Email == nil && req.Telegram == nil {
 		return fmt.Errorf(
 			"cannot process request: %w: missing message payload (email or telegram) in request",

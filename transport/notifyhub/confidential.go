@@ -112,6 +112,13 @@ type confidentialResponse struct {
 // back. Only HTTP 200 with status accepted is successful. Repeat an identical
 // operation using its stable key to recover the gateway's metadata-only outcome;
 // an unknown outcome must not trigger a blind resend with a new key.
+//
+// Deprecated: NotifyHub retired /v1/confidential-email (HTTP 410). Migrate callers
+// explicitly to Submit/Get with priority high and the original absolute expiry.
+// Historical confidential keys cannot be replayed into that queue. Hold/reconcile
+// old accepted or unknown operations; never bypass the fence with a new key.
+// Submit success means queue ownership, never synchronous provider acceptance.
+// This legacy method deliberately retains its old synchronous, fail-closed semantics.
 func (c *Client) SendConfidentialEmail(ctx context.Context, req ConfidentialEmailRequest) (ConfidentialEmailReceipt, error) {
 	if err := validateConfidentialRequest(req); err != nil {
 		return ConfidentialEmailReceipt{}, confidentialError(OutcomeNotSent, 0, "invalid_request", err)

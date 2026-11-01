@@ -80,12 +80,38 @@ type HealthChecker interface {
 	Ping(ctx context.Context) error
 }
 
+// Priority selects gateway scheduling priority. The zero value uses normal priority.
+// NotifyHub currently accepts only normal and high; high requires an absolute expiry.
+type Priority string
+
+const (
+	PriorityNormal Priority = "normal"
+	PriorityHigh   Priority = "high"
+)
+
+// ValidatePriority checks the NotifyHub-compatible scheduling contract.
+// It does not move or extend expiresAt; deadline enforcement remains the transport's job.
+func ValidatePriority(priority Priority, expiresAt *time.Time) error {
+	switch priority {
+	case "", PriorityNormal:
+		return nil
+	case PriorityHigh:
+		if expiresAt != nil && !expiresAt.IsZero() && expiresAt.Unix() != 0 {
+			return nil
+		}
+		return fmt.Errorf("%w: high priority requires expires_at", ErrInvalidRequest)
+	default:
+		return fmt.Errorf("%w: unsupported priority", ErrInvalidRequest)
+	}
+}
+
 // Request is the immutable notification delivery request.
 //
 //nolint:tagliatelle // Serialization contract uses snake_case for external compatibility.
 type Request struct {
-	Event          string `json:"event"`
-	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	Event          string   `json:"event"`
+	Priority       Priority `json:"priority,omitempty"`
+	IdempotencyKey string   `json:"idempotency_key,omitempty"`
 	// ExpiresAt is the exclusive submission and delivery deadline; nil means no expiration.
 	ExpiresAt *time.Time       `json:"expires_at,omitempty"`
 	Email     *EmailMessage    `json:"email,omitempty"`

@@ -1,5 +1,35 @@
 # Implementation Notes
 
+## 2026-10-31 Local queued email adaptation
+
+Source baseline: master `7b5e3c74da5d4404a6b0b507cf46fd7f0ebc20f3` verified by the parent.
+Only local source edits are authorized; no release, push, deploy, real mail or secrets.
+
+- Match the server's real accepted priorities: empty/normal/high. `low` is rejected;
+  high requires a nonzero absolute expiry. Validate before HTTP and outbox staging.
+- Preserve absolute expiry as whole Unix seconds, rendered body and opaque key on
+  every retry. The existing expiry admission checks remain unchanged.
+- Expose a small per-delivery status classifier, not another mail architecture.
+  Submit nil confirms durable queue ownership, never provider/inbox success.
+  Known unknown and future status strings retain receipts and classify unknown;
+  do not convert them to submission errors that would erase queue ownership.
+- Migration must fence pre-cutover managed rows: historical confidential keys
+  cannot enter the new queue, and old accepted/unknown outcomes never permit a
+  new namespace/key. No historical body migration is assumed.
+- Deprecate the synchronous confidential API without changing its fail-closed
+  behavior or silently queueing. The server retired that endpoint with HTTP 410.
+- Fake HTTP coverage includes 503 to 202 queued duplicate to 202 unknown duplicate,
+  stable wire/key/expiry, receipt reconciliation, invalid priority/expiry before I/O,
+  and legacy 410 without fallback. Outbox tests cover priority/deadline round-trip.
+- Stable consumer package set unchanged; public aliases, manifest comments and
+  smoke tests updated. Shared wiki edits are outside this local-only ownership.
+
+Verification: changed Go files formatted with the configured Go toolchain.
+Focused `go test -p 1 ./transport ./transport/notifyhub` attempted offline;
+NotifyHub setup is blocked by missing pinned outbox v0.15.0 in the shared module
+cache. Compilation of the remaining package was interrupted to respect the shared
+build slot. No full gate, race, vet or lint result is claimed yet.
+
 ## 2026-10-01 PR 3 Recursive Preload and Independent Review
 
 Goal: resolve PR comments 4154781256 (recursive preload) and 4154781246
